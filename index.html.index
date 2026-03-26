@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quest Master Pro</title>
+    <style>
+        :root { 
+            --gold: #ffd700; 
+            --bg: #0f0f1a; 
+            --card: rgba(26, 26, 46, 0.9); 
+            --text: #e0e0e0; 
+            --accent: #ff4757; 
+        }
+        
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            margin: 0; padding: 0; 
+            overflow-x: hidden;
+            transition: background 0.5s ease;
+        }
+
+        /* רקע חי - חלקיקים */
+        #bg-canvas { position: fixed; top: 0; left: 0; z-index: -1; }
+
+        .header { background: var(--card); padding: 25px; border-bottom: 3px solid var(--gold); text-align: center; backdrop-filter: blur(10px); }
+        .lvl-box { background: var(--gold); color: #000; display: inline-block; padding: 5px 20px; border-radius: 20px; font-weight: bold; margin-bottom: 10px; box-shadow: 0 0 15px var(--gold); }
+        
+        .xp-container { width: 100%; height: 12px; background: #333; border-radius: 6px; margin-top: 15px; overflow: hidden; border: 1px solid #444; }
+        #xp-bar { width: 0%; height: 100%; background: linear-gradient(90deg, var(--gold), #fff); transition: 0.5s; }
+
+        .quest-list { padding: 20px; padding-bottom: 120px; }
+        
+        /* אנימציית ביצוע משימה */
+        .quest-item { 
+            background: var(--card); padding: 20px; border-radius: 15px; margin-bottom: 15px; 
+            display: flex; justify-content: space-between; align-items: center; 
+            border-right: 6px solid var(--gold); transition: 0.3s;
+            animation: slideIn 0.4s ease-out;
+        }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(30px); } }
+        .completed { transform: scale(0.9); opacity: 0; }
+
+        .btn { border: none; border-radius: 10px; font-weight: bold; cursor: pointer; padding: 12px 20px; transition: 0.2s; }
+        .btn-complete:active { transform: scale(0.9); }
+        .btn-add { position: fixed; bottom: 30px; left: 30px; width: 65px; height: 65px; border-radius: 50%; background: var(--accent); color: white; font-size: 30px; border: none; box-shadow: 0 0 15px var(--accent); cursor: pointer; }
+
+        /* חנות ובונוסים */
+        .shop-btn { position: fixed; bottom: 30px; right: 30px; width: 65px; height: 65px; border-radius: 50%; background: #4a4ae1; color: white; border: none; font-size: 24px; cursor: pointer; }
+
+        #modal, #shop-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-content { background: var(--card); padding: 30px; border-radius: 20px; width: 85%; max-width: 400px; border: 2px solid var(--gold); text-align: center; }
+
+        /* אנימציית עלית רמה */
+        #lvl-up-overlay { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255, 215, 0, 0.2); z-index: 1000; 
+            justify-content: center; align-items: center; flex-direction: column;
+            animation: flash 1s infinite alternate;
+        }
+        @keyframes flash { from { background: rgba(255, 215, 0, 0.1); } to { background: rgba(255, 215, 0, 0.4); } }
+    </style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="header">
+    <div class="lvl-box" id="lvl-txt">רמה 1</div>
+    <div style="font-size: 22px; font-weight: bold; color: var(--gold);" id="hero-title">הרפתקן האומץ</div>
+    <div class="xp-container"><div id="xp-bar"></div></div>
+    <div style="font-size: 12px; margin-top: 5px;" id="xp-num">0 / 100 XP</div>
+</div>
+
+<div class="quest-list" id="list"></div>
+
+<button class="btn-add" onclick="toggleModal('modal', true)">+</button>
+<button class="shop-btn" onclick="toggleModal('shop-modal', true)">🛒</button>
+
+<!-- מודאל משימה -->
+<div id="modal">
+    <div class="modal-content">
+        <h2 style="margin:0; color:var(--gold);">משימה חדשה</h2>
+        <input type="text" id="q-input" style="width:100%; padding:15px; margin:15px 0; background:#000; color:#fff; border-radius:10px; border:1px solid #444;" placeholder="מה המטרה?">
+        <div style="display:flex; gap:10px;">
+            <button class="btn" style="flex:1; background:#444; color:white;" onclick="toggleModal('modal', false)">ביטול</button>
+            <button class="btn" style="flex:1; background:var(--gold);" onclick="addQuest()">צא לדרך</button>
+        </div>
+    </div>
+</div>
+
+<!-- מודאל חנות -->
+<div id="shop-modal">
+    <div class="modal-content">
+        <h2 style="margin:0; color:var(--gold);">חנות רקעים</h2>
+        <p>שנה את אווירת המסע שלך:</p>
+        <button class="btn" style="width:100%; margin:5px 0; background:#0f0f1a; color:white;" onclick="changeTheme('#0f0f1a')">חלל עמוק (חינם)</button>
+        <button class="btn" style="width:100%; margin:5px 0; background:#1a0f0f; color:white;" onclick="changeTheme('#1a0f0f')">ממלכת האש (רמה 3)</button>
+        <button class="btn" style="width:100%; margin:5px 0; background:#0f1a0f; color:white;" onclick="changeTheme('#0f1a0f')">יער קסום (רמה 5)</button>
+        <button class="btn" style="width:100%; margin-top:15px; background:#444; color:white;" onclick="toggleModal('shop-modal', false)">סגור</button>
+    </div>
+</div>
+
+<!-- מסך עלית רמה -->
+<div id="lvl-up-overlay" onclick="this.style.display='none'">
+    <h1 style="font-size: 50px; color: white; text-shadow: 0 0 20px gold;">עלית רמה!</h1>
+    <p style="font-size: 20px; color: white;">כוחך גדל משמעותית</p>
+    <button class="btn" style="background:white;">המשך במסע</button>
+</div>
+
+<script>
+    let data = JSON.parse(localStorage.getItem('adv_game_v3')) || { lvl: 1, xp: 0, quests: [], theme: '#0f0f1a' };
+
+    function save() {
+        localStorage.setItem('adv_game_v3', JSON.stringify(data));
+        render();
+    }
+
+    function toggleModal(id, show) {
+        document.getElementById(id).style.display = show ? 'flex' : 'none';
+    }
+
+    function changeTheme(color) {
+        if(color === '#1a0f0f' && data.lvl < 3) return alert("צריך רמה 3!");
+        if(color === '#0f1a0f' && data.lvl < 5) return alert("צריך רמה 5!");
+        data.theme = color;
+        document.body.style.background = color;
+        save();
+    }
+
+    function addQuest() {
+        let val = document.getElementById('q-input').value;
+        if(val) {
+            data.quests.push({ id: Date.now(), txt: val, xp: 50 });
+            document.getElementById('q-input').value = '';
+            toggleModal('modal', false);
+            save();
+        }
+    }
+
+    function finish(id, xp, el) {
+        el.parentElement.classList.add('completed');
+        setTimeout(() => {
+            data.quests = data.quests.filter(q => q.id !== id);
+            data.xp += xp;
+            if(data.xp >= data.lvl * 100) {
+                data.xp = 0;
+                data.lvl++;
+                document.getElementById('lvl-up-overlay').style.display = 'flex';
+            }
+            save();
+        }, 400);
+    }
+
+    function render() {
+        document.body.style.background = data.theme;
+        document.getElementById('lvl-txt').innerText = "רמה " + data.lvl;
+        document.getElementById('xp-num').innerText = data.xp + " / " + (data.lvl * 100) + " XP";
+        document.getElementById('xp-bar').style.width = (data.xp / (data.lvl * 100) * 100) + "%";
+        
+        let html = '';
+        data.quests.forEach(q => {
+            html += `<div class="quest-item">
+                <div><b>${q.txt}</b><br><small style="color:var(--gold)">+${q.xp} XP</small></div>
+                <button class="btn" style="background:var(--gold)" onclick="finish(${q.id}, ${q.xp}, this)">בוצע</button>
+            </div>`;
+        });
+        document.getElementById('list').innerHTML = html || '<p style="text-align:center; color:#555; margin-top:50px;">אין משימות באופק...</p>';
+    }
+
+    // מערכת חלקיקים לרקע
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function initParticles() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        particles = [];
+        for(let i=0; i<50; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2,
+                speed: Math.random() * 0.5 + 0.2
+            });
+        }
+    }
+
+    function animate() {
+        ctx.clearRect(0,0, canvas.width, canvas.height);
+        ctx.fillStyle = "rgba(255, 215, 0, 0.3)";
+        particles.forEach(p => {
+            p.y -= p.speed;
+            if(p.y < 0) p.y = canvas.height;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+            ctx.fill();
+        });
+        requestAnimationFrame(animate);
+    }
+
+    window.onresize = initParticles;
+    initParticles();
+    animate();
+    render();
+</script>
+</body>
+</html>
